@@ -1,4 +1,4 @@
-from Lib import Package, PackageDestination, PackageType
+from Lib.Package import Package, PackageDestination, PackageType
 
 packages = [
     Package(
