@@ -17,4 +17,4 @@ ga = GA(
     populationCount=populationCount,
 )
 
-ga.run(5000, step=100)
+ga.run(10000, step=100)

@@ -38,3 +38,6 @@ class Package:
         self.isFragile = isFragile
         self.destination = destination
         self.type = type
+
+    def __str__(self) -> str:
+        return f"{self.name}: ({self.weight}Kg, {self.volume}m^3, Fragile? {self.isFragile}, {self.type}, {self.destination})"

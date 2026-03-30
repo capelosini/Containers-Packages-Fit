@@ -33,9 +33,12 @@ class GA:
         volume = {}
         fragilePackages = {}
         packageTypes = {}
+        destinations = {}
         for i in range(len(individual)):
             package = self.packages[i]
             id = individual[i]
+            destinations[id] = destinations.get(id, [])
+            destinations[id].append(package.destination)
             weight[id] = package.weight + weight.get(id, 0)
             volume[id] = package.volume + volume.get(id, 0)
             fragilePackages[id] = fragilePackages.get(id, 0) + (
@@ -62,11 +65,32 @@ class GA:
             ):
                 return 99999999
 
-        return score
+        uniqueDestinationsPerContainer = [len(set(d)) for d in destinations.values()]
+
+        return score + sum(uniqueDestinationsPerContainer) / len(
+            uniqueDestinationsPerContainer
+        )
 
     def select(self):
         scores = np.apply_along_axis(axis=1, arr=self.population, func1d=self.fitness)
-        self.population = self.population[np.argsort(scores)][: self.populationCount]
+
+        penalized_value = 999999
+        is_penalized = scores >= penalized_value
+
+        if np.all(is_penalized):
+            probs = np.ones(len(scores)) / len(scores)
+        else:
+            max_valid = np.max(scores[~is_penalized])
+
+            weights = np.where(is_penalized, 1e-10, (max_valid - scores) + 1e-6)
+
+            probs = weights / np.sum(weights)
+
+        indices = np.random.choice(
+            len(self.population), size=self.populationCount, p=probs
+        )
+
+        self.population = self.population[indices]
 
     def getRandomGeneIndex(self):
         return random.randint(0, self.population.shape[1] - 1)
@@ -96,21 +120,48 @@ class GA:
         offspring = np.vstack([childA, childB])
         return offspring
 
-    def forward(self):
+    def forward(self, mutationRate=0.05):
         offspring = self.crossover()
 
-        mutatedOffspring = self.mutate(offspring)
+        mutatedOffspring = self.mutate(offspring, mutationRate=mutationRate)
 
         self.population = np.vstack([self.population, mutatedOffspring])
 
         self.select()
 
+    def printIndividual(self, individual):
+        containers = {}
+        for i in range(len(individual)):
+            containerId = individual[i]
+            package = self.packages[i]
+            containers[containerId] = containers.get(containerId, [])
+            containers[containerId].append(package)
+
+        for key in containers.keys():
+            print(f"--Container #{key}")
+            totalWeight = 0
+            for p in containers[key]:
+                print(f"\t{p}")
+                totalWeight += p.weight
+            print(f"Total Weight: {totalWeight}")
+        print(f"Total Containers: {len(containers)}")
+
     def run(self, epochs=100, step=1):
-        firstFitness = self.fitness(self.population[0])
+        # firstFitness = self.fitness(self.population[0])
+        mutationRate = 0.05
+        x = []
+        y = []
         for epoch in range(epochs):
-            self.forward()
+            self.forward(mutationRate=mutationRate)
             fit = self.fitness(self.population[0])
-            if epoch % step == 0:
-                print(f"Epoch {epoch}")
+            if (epoch + 1) % step == 0:
+                print(f"Epoch {epoch + 1}")
                 print(fit)
-                print(f"Error: {fit - firstFitness}")
+                x.append(epoch + 1)
+                y.append(fit)
+                # print(f"Error: {fit - firstFitness}")
+        self.printIndividual(self.population[0])
+
+        print(
+            f'xychart-beta\n\ttitle "Fitness Evolution — pop={self.populationCount}, mut={mutationRate}"\n\tx-axis "Generation" {x}\n\ty-axis "Fitness" 0 --> 20\n\tline {y}'
+        )
